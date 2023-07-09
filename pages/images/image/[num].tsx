@@ -42,7 +42,6 @@ export default function SingleImage() {
         }
         return () => {
             //@ts-ignore
-            canvas = context = img = undefined;
             document.removeEventListener("mousedown", mousedown);
             document.removeEventListener("mouseup", mouseup);
         };
