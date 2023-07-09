@@ -28,7 +28,6 @@ export default function SingleImage() {
         if (!isLoading && imageExists) {
             canvas = document.getElementById("canvas") as HTMLCanvasElement;
             context = canvas.getContext('2d') as CanvasRenderingContext2D;
-            img = document.createElement("img");
             if (window.innerWidth < 768) {
                 canvas.width = 400;
             } else if (window.innerWidth < 1024) {
@@ -67,23 +66,21 @@ export default function SingleImage() {
         document.removeEventListener("mousemove", mousemove);
     };
     useEffect(() => {
-        if (canvas && context && img) {
-            img.src = imageProps.loc;
-            context.drawImage(img, 0, 0, canvas.width, canvas.height);
-        }
-    }, [imageProps, isLoading, imageExists]);
-    useEffect(() => {
         if (router.query.num) {
             const { num } = router.query;
             let image = getImageLoc(Number(num));
             checkFileExists(image).then((exists: boolean) => {
                 if (exists) {
+                    let src = getFullPath(image);
                     setImageExists(true);
                     setImageProps({
                         Key: image,
                         href: `/images/image/${num}`,
-                        loc: getFullPath(image),
+                        loc: src,
                     });
+                    img = document.createElement("img");
+                    img.src = src;
+                    context.drawImage(img, 0, 0, canvas.width, canvas.height);
                 } else {
                     setImageExists(false);
                 }
