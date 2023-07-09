@@ -24,27 +24,6 @@ export default function SingleImage() {
     const [penSize, setPenSize] = useState<number>(2);
     const [players, setPlayers] = useState<ImageData[]>([]);
     const [showPlayers, setShowPlayers] = useState<boolean>(true);
-    useEffect(() => {
-        if (!isLoading && imageExists) {
-            canvas = document.getElementById("canvas") as HTMLCanvasElement;
-            context = canvas.getContext('2d') as CanvasRenderingContext2D;
-            if (window.innerWidth < 768) {
-                canvas.width = 400;
-            } else if (window.innerWidth < 1024) {
-                canvas.width = 600;
-            } else {
-                canvas.width = 800;
-            }
-            canvas.height = canvas.width * 9 / 16;
-            document.addEventListener("mousedown", mousedown);
-            document.addEventListener("mouseup", mouseup);
-        }
-        return () => {
-            //@ts-ignore
-            document.removeEventListener("mousedown", mousedown);
-            document.removeEventListener("mouseup", mouseup);
-        };
-    }, [isLoading, imageExists]);
     const mousemove = (event: MouseEvent) => {
         if (canvas) {
             const rect: DOMRect = canvas.getBoundingClientRect();
@@ -78,9 +57,6 @@ export default function SingleImage() {
                         href: `/images/image/${num}`,
                         loc: src,
                     });
-                    img = document.createElement("img");
-                    img.src = src;
-                    context.drawImage(img, 0, 0, canvas.width, canvas.height);
                 } else {
                     setImageExists(false);
                 }
@@ -88,6 +64,34 @@ export default function SingleImage() {
             });
         }
     }, [router.query]);
+    useEffect(() => {
+        if (!isLoading && imageExists) {
+            canvas = document.getElementById("canvas") as HTMLCanvasElement;
+            context = canvas.getContext('2d') as CanvasRenderingContext2D;
+            if (window.innerWidth < 768) {
+                canvas.width = 400;
+            } else if (window.innerWidth < 1024) {
+                canvas.width = 600;
+            } else {
+                canvas.width = 800;
+            }
+            img = document.createElement("img");
+            img.src = imageProps.loc;
+            img.onload = () => {
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+            canvas.height = canvas.width * 9 / 16;
+            //context.fillStyle = "black";
+            //context.fillRect(0, 0, canvas.width, canvas.height);
+            document.addEventListener("mousedown", mousedown);
+            document.addEventListener("mouseup", mouseup);
+        }
+        return () => {
+            //@ts-ignore
+            document.removeEventListener("mousedown", mousedown);
+            document.removeEventListener("mouseup", mouseup);
+        };
+    }, [imageProps, isLoading, imageExists]);
     useEffect(() => {
         if (context && canvas) {
             drawLocations(stateLocations);
