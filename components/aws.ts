@@ -7,7 +7,7 @@ const s3 = new AWS.S3({
     region: "us-east-1"
 });
 export async function setNewRecentImage(num: number) {
-    await uploadFile('recentImageNum.txt', String(num));
+    await uploadFile('startingIndex.txt', String(num));
 }
 export async function uploadFile(key: string, data: string) {
     const params: PutObjectRequest = {
@@ -20,25 +20,32 @@ export async function uploadFile(key: string, data: string) {
 }
 export async function getRecentImageNum(): Promise<number> {
     try {
-        const num = await getTextData('recentImageNum.txt');
+        const num = await getTextData('startingIndex.txt');
         return Number(num);
     } catch (e) {
         return 0;
     }
 }
 export async function getTextData(key: string): Promise<string> {
-    const params: GetObjectRequest = {
-        Bucket: 'timberwolves-data-processing',
-        Key: key,
-    };
+    try {
+        const params: GetObjectRequest = {
+            Bucket: 'timberwolves-data-processing',
+            Key: key,
+        };
 
-    const data = await s3.getObject(params).promise();
+        const data = await s3.getObject(params).promise();
 
-    if (!(data.Body instanceof Buffer)) {
-        throw new Error("Retrieved data is not a Buffer");
+        if (!(data.Body instanceof Buffer)) {
+            throw new Error("Retrieved data is not a Buffer");
+        }
+
+        return data.Body.toString('utf-8');
+    } catch (e) {
+        return JSON.stringify({
+            locations: [],
+            positions: [],
+        });
     }
-
-    return data.Body.toString('utf-8');
 }
 export async function checkFileExists(key: string): Promise<boolean> {
     const params: HeadObjectRequest = {

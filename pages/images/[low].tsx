@@ -15,6 +15,7 @@ export default function ImagePage() {
     useEffect(() => {
         if (router.query) {
             const { low } = router.query;
+            console.log(low);
             getInRange(Number(low), Number(low) + 100).then((imageProps: ImageProps[]) => {
                 console.log(imageProps);
                 if (imageProps.length === 0) {

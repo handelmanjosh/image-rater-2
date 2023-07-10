@@ -1,7 +1,9 @@
 import Loader from "@/components/Loader";
-import { checkFileExists } from "@/components/aws";
+import { checkFileExists, getTextData, uploadFile } from "@/components/aws";
+import { deserialize, serialize } from "@/components/process";
 import { ImageData, ImageProps } from "@/components/types";
 import { getFileLoc, getFullPath, getImageLoc } from "@/components/utils";
+import { setLazyProp } from "next/dist/server/api-utils";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
@@ -9,7 +11,7 @@ const availablePositions: string[] = [
     "O - Center", "O - Forward", "O - Power Forward", "O - Small Forward", "O - Guard", "O - Shooting Guard", "O - Point Guard",
     "D - Center", "D - Forward", "D - Power Forward", "D - Small Forward", "D - Guard", "D - Shooting Guard", "D - Point Guard",
 ];
-const locations: number[][][] = [];
+
 let canvas: HTMLCanvasElement;
 let context: CanvasRenderingContext2D;
 let img: HTMLImageElement;
@@ -24,6 +26,7 @@ export default function SingleImage() {
     const [penSize, setPenSize] = useState<number>(2);
     const [players, setPlayers] = useState<ImageData[]>([]);
     const [showPlayers, setShowPlayers] = useState<boolean>(true);
+    const [num, setNum] = useState<number>();
     const mousemove = (event: MouseEvent) => {
         if (canvas) {
             const rect: DOMRect = canvas.getBoundingClientRect();
@@ -45,8 +48,9 @@ export default function SingleImage() {
         document.removeEventListener("mousemove", mousemove);
     };
     useEffect(() => {
-        if (router.query.num) {
+        if (!isNaN(Number(router.query.num))) {
             const { num } = router.query;
+            setNum(Number(num));
             let image = getImageLoc(Number(num));
             checkFileExists(image).then((exists: boolean) => {
                 if (exists) {
@@ -57,10 +61,22 @@ export default function SingleImage() {
                         href: `/images/image/${num}`,
                         loc: src,
                     });
+                    getTextData(getFileLoc(Number(num))).then((data: string) => {
+                        let parsedData = deserialize(data);
+                        setStateLocations(parsedData.locations);
+                        const players = parsedData.positions.map((position: string[]) => {
+                            return {
+                                locations: [],
+                                positions: position,
+                            };
+                        });
+                        setPlayers(players);
+                        setIsLoading(false);
+                    });
                 } else {
                     setImageExists(false);
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             });
         }
     }, [router.query]);
@@ -75,12 +91,13 @@ export default function SingleImage() {
             } else {
                 canvas.width = 800;
             }
+            canvas.height = canvas.width * 9 / 16;
             img = document.createElement("img");
             img.src = imageProps.loc;
             img.onload = () => {
                 context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                firstDraw();
             };
-            canvas.height = canvas.width * 9 / 16;
             //context.fillStyle = "black";
             //context.fillRect(0, 0, canvas.width, canvas.height);
             document.addEventListener("mousedown", mousedown);
@@ -92,6 +109,13 @@ export default function SingleImage() {
             document.removeEventListener("mouseup", mouseup);
         };
     }, [imageProps, isLoading, imageExists]);
+    const firstDraw = () => {
+        setStateLocations(prevLocations => {
+            console.log(prevLocations);
+            drawLocations(prevLocations);
+            return prevLocations;
+        });
+    };
     useEffect(() => {
         if (context && canvas) {
             drawLocations(stateLocations);
@@ -114,6 +138,7 @@ export default function SingleImage() {
         });
     };
     const drawLocations = (locations: number[][][]) => {
+        console.log("drawn");
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(img, 0, 0, canvas.width, canvas.height);
         for (let i = 0; i < locations.length; i++) {
@@ -190,15 +215,15 @@ export default function SingleImage() {
                     />
                     <p>{`Pen Size: ${penSize}`}</p>
                 </div>
-                <div className="absolute m-2 top-0 left-0">
+                <div className="absolute m-2 top-0 left-0 gap-2 flex w-auto flex-col justify-center items-center">
                     <button
-                        className={`${showPlayers ? "bg-red-600" : "bg-green-600"} px-4 py-2 hover:brightness-90 active:brightness-75 rounded-lg`}
+                        className={`${showPlayers ? "bg-red-600" : "bg-green-600"} px-4 w-full py-2 hover:brightness-90 active:brightness-75 rounded-lg`}
                         onClick={() => setShowPlayers(!showPlayers)}
                     >
                         {`${showPlayers ? "Hide" : "Show"} Players`}
                     </button>
                     <button
-                        className="bg-green-600 px-4 py-2 hover:brightness-90 active:brightness-75 rounded-lg"
+                        className="bg-green-600 px-4 py-2 w-full hover:brightness-90 active:brightness-75 rounded-lg"
                         onClick={() => {
                             setPlayers(players => {
                                 const newPlayers = [...players];
@@ -206,15 +231,37 @@ export default function SingleImage() {
                                     locations: [],
                                     positions: [],
                                 });
+                                setSelectedPlayer(newPlayers.length - 1);
+                                options.selectedPlayer = newPlayers.length - 1;
+
                                 return newPlayers;
                             });
                         }}
                     >
                         Add new player
                     </button>
+                    <button
+                        className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
+                        onClick={() => {
+                            let positions = players.map((player: ImageData) => player.positions);
+                            const data = serialize(stateLocations, positions);
+                            console.log(num, stateLocations, positions);
+                            if (num !== undefined) {
+                                setIsLoading(true);
+                                uploadFile(getFileLoc(num), data).then(() => {
+                                    setIsLoading(false);
+                                }).catch(err => {
+                                    console.error(err);
+                                    setIsLoading(false);
+                                });
+                            }
+                        }}
+                    >
+                        Save
+                    </button>
                 </div>
                 {showPlayers && players.length > 0 && (
-                    <div className="absolute m-2 top-0 right-0 w-[30%] h-auto max-h-[95%] grid grid-cols-2 overflow-y-auto gap-2 p-2 bg-slate-600/60">
+                    <div className="absolute m-2 top-0 right-0 w-[30%] h-auto max-h-[95%] grid grid-cols-2 overflow-y-auto gap-2 rounded-lg p-2 bg-slate-600/60">
                         {players.map((player: ImageData, i: number) => {
                             return (
                                 <div key={i} className={`flex flex-col p-1 gap-1 justify-center items-center ${selectedPlayer == i ? "bg-yellow-400" : "bg-gray-400"}  rounded-lg`}>
