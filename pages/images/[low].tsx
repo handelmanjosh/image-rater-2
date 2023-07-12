@@ -15,18 +15,19 @@ export default function ImagePage() {
     useEffect(() => {
         if (router.query) {
             const { low } = router.query;
-            console.log(low);
-            getInRange(Number(low), Number(low) + 100).then((imageProps: ImageProps[]) => {
-                console.log(imageProps);
-                if (imageProps.length === 0) {
-                    console.log("No images found");
-                    setNoImages(true);
-                } else {
-                    setImageProps(imageProps);
-                    setNoImages(false);
-                }
-                setIsLoading(false);
-            });
+            if (low !== undefined) {
+                getInRange(Number(low), Number(low) + 100).then((imageProps: ImageProps[]) => {
+                    console.log(imageProps);
+                    if (imageProps.length === 0) {
+                        console.log("No images found");
+                        setNoImages(true);
+                    } else {
+                        setImageProps(imageProps);
+                        setNoImages(false);
+                    }
+                    setIsLoading(false);
+                });
+            }
         }
     }, [router.query]);
     if (isLoading) {
@@ -44,7 +45,7 @@ export default function ImagePage() {
     } else {
         return (
             <div className="flex flex-col justify-center items-center gap-2">
-                <div className="w-full h-full grid grid-cols-10 gap-2 place-items-center items-center p-2">
+                <div className="w-full h-full grid xl:grid-cols-10 lg:grid-cols-8 md:grid-cols-6 grid-cols-4 gap-2 place-items-center items-center p-2">
                     {imageProps.map((imageProp: ImageProps, i: number) => (
                         <ImageModal key={i} {...imageProp} />
                     ))}

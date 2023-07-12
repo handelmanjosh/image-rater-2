@@ -1,4 +1,5 @@
 import Loader from "@/components/Loader";
+import NextLink from "@/components/NextLink";
 import { checkFileExists, getTextData, uploadFile } from "@/components/aws";
 import { deserialize, serialize } from "@/components/process";
 import { ImageData, ImageProps } from "@/components/types";
@@ -215,6 +216,11 @@ export default function SingleImage() {
                     />
                     <p>{`Pen Size: ${penSize}`}</p>
                 </div>
+                <div className="flex flex-row justify-center items-center gap-2">
+                    <NextLink href={`/images/image/${Number(router.query.num) - 1}`} text="Previous" />
+                    <NextLink href={`/images/${Number(router.query.num)}`} text="Home" />
+                    <NextLink href={`/images/image/${Number(router.query.num) + 1}`} text="Next" />
+                </div>
                 <div className="absolute m-2 top-0 left-0 gap-2 flex w-auto flex-col justify-center items-center">
                     <button
                         className={`${showPlayers ? "bg-red-600" : "bg-green-600"} px-4 w-full py-2 hover:brightness-90 active:brightness-75 rounded-lg`}
@@ -290,8 +296,7 @@ export default function SingleImage() {
                                             console.log("reset");
                                             setStateLocations(prevLocations => {
                                                 let newLocations = [...prevLocations];
-                                                newLocations[selectedPlayer] = [];
-                                                console.log(newLocations);
+                                                newLocations[i] = [];
                                                 return newLocations;
                                             });
                                         }}
