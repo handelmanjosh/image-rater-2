@@ -27,19 +27,23 @@ export default function SingleImage() {
     const [penSize, setPenSize] = useState<number>(2);
     const [players, setPlayers] = useState<ImageData[]>([]);
     const [showPlayers, setShowPlayers] = useState<boolean>(true);
+    const [canvasSize, setCanvasSize] = useState<[number, number]>([0, 0]);
+    const [transparent, setTransparent] = useState<boolean>(false);
     const [num, setNum] = useState<number>();
     const mousemove = (event: MouseEvent) => {
         if (canvas) {
             const rect: DOMRect = canvas.getBoundingClientRect();
             const x: number = event.clientX - rect.left - window.scrollX;
             const y: number = event.clientY - rect.top - window.scrollY;
-            const positions: [number, number][] = [];
-            for (let i = - options.size / 2; i < options.size / 2; i++) {
-                for (let j = - options.size / 2; j < options.size / 2; j++) {
-                    positions.push([Math.floor(x + i), Math.floor(y + j)]);
+            if (x < canvas.width && x > 0 && y < canvas.height && y > 0) {
+                const positions: [number, number][] = [];
+                for (let i = - options.size / 2; i < options.size / 2; i++) {
+                    for (let j = - options.size / 2; j < options.size / 2; j++) {
+                        positions.push([Math.floor(x + i), Math.floor(y + j)]);
+                    }
                 }
+                updatePosition(positions);
             }
-            updatePosition(positions);
         }
     };
     const mousedown = () => {
@@ -93,6 +97,7 @@ export default function SingleImage() {
                 canvas.width = 800;
             }
             canvas.height = canvas.width * 9 / 16;
+            setCanvasSize([canvas.width, canvas.height]);
             img = document.createElement("img");
             img.src = imageProps.loc;
             img.onload = () => {
@@ -112,16 +117,15 @@ export default function SingleImage() {
     }, [imageProps, isLoading, imageExists]);
     const firstDraw = () => {
         setStateLocations(prevLocations => {
-            console.log(prevLocations);
-            drawLocations(prevLocations);
+            drawLocations(prevLocations, transparent);
             return prevLocations;
         });
     };
     useEffect(() => {
         if (context && canvas) {
-            drawLocations(stateLocations);
+            drawLocations(stateLocations, transparent);
         }
-    }, [stateLocations, selectedPlayer]);
+    }, [stateLocations, selectedPlayer, transparent]);
     const updatePosition = (positions: [number, number][]) => {
         setStateLocations(prevLocations => {
             let newLocations = [...prevLocations];
@@ -138,15 +142,18 @@ export default function SingleImage() {
             return newLocations;
         });
     };
-    const drawLocations = (locations: number[][][]) => {
-        console.log("drawn");
+    const drawLocations = (locations: number[][][], transparent: boolean) => {
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(img, 0, 0, canvas.width, canvas.height);
         for (let i = 0; i < locations.length; i++) {
             for (const coords of locations[i]) {
                 context.beginPath();
                 context.arc(coords[0], coords[1], 1, 0, 2 * Math.PI);
-                context.fillStyle = (i == options.selectedPlayer) ? "blue" : "red";
+                if (transparent) {
+                    context.fillStyle = (i == options.selectedPlayer) ? "rgba(0, 0, 255, 0.1)" : "rgba(255, 0, 0, 0.1)";
+                } else {
+                    context.fillStyle = (i == options.selectedPlayer) ? "blue" : "red";
+                }
                 context.fill();
             }
         }
@@ -229,6 +236,12 @@ export default function SingleImage() {
                         {`${showPlayers ? "Hide" : "Show"} Players`}
                     </button>
                     <button
+                        className={`${transparent ? "bg-red-600" : "bg-green-600"} px-4 w-full py-2 hover:brightness-90 active:brightness-75 rounded-lg`}
+                        onClick={() => setTransparent(!transparent)}
+                    >
+                        Toggle transparency
+                    </button>
+                    <button
                         className="bg-green-600 px-4 py-2 w-full hover:brightness-90 active:brightness-75 rounded-lg"
                         onClick={() => {
                             setPlayers(players => {
@@ -250,7 +263,7 @@ export default function SingleImage() {
                         className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
                         onClick={() => {
                             let positions = players.map((player: ImageData) => player.positions);
-                            const data = serialize(stateLocations, positions);
+                            const data = serialize(stateLocations, positions, canvasSize);
                             console.log(num, stateLocations, positions);
                             if (num !== undefined) {
                                 setIsLoading(true);
