@@ -1,15 +1,17 @@
 type Data = {
-    locations: number[][][],
-    positions: string[][],
-    size: [number, number],
+    locations: number[][][];
+    positions: string[][];
+    size: [number, number];
+    type: "outline" | "fill";
 };
 
 
-export function serialize(locations: number[][][], positions: string[][], size: [number, number]): string {
+export function serialize(locations: number[][][], positions: string[][], size: [number, number], type: "outline" | "fill"): string {
     let obj: Data = {
         positions,
         locations,
         size,
+        type
     };
     return JSON.stringify(obj);
 }

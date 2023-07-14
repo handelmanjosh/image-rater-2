@@ -1,6 +1,6 @@
 import Loader from "@/components/Loader";
 import NextLink from "@/components/NextLink";
-import { checkFileExists, getTextData, uploadFile } from "@/components/aws";
+import { checkFileExists, getTextData, setNewRecentImage, uploadFile } from "@/components/aws";
 import { deserialize, serialize } from "@/components/process";
 import { ImageData, ImageProps } from "@/components/types";
 import { getFileLoc, getFullPath, getImageLoc } from "@/components/utils";
@@ -17,6 +17,34 @@ let canvas: HTMLCanvasElement;
 let context: CanvasRenderingContext2D;
 let img: HTMLImageElement;
 let options: { selectedPlayer: number, size: number; } = { selectedPlayer: 0, size: 2 };
+// const setStateWorkerFunction = function () {
+//     self.onmessage = function (event) {
+//         let { setStateLocations, positions, binarySearchAdd } = event.data;
+//         setStateLocations = new Function(setStateLocations)();
+//         binarySearchAdd = new Function(binarySearchAdd)();
+//         setStateLocations((prevLocations: any) => {
+//             // Add new positions to the existing ones or create a new subarray
+//             let playerLocations = prevLocations[options.selectedPlayer]
+//                 ? prevLocations[options.selectedPlayer]
+//                 : positions;
+
+//             // Each position needs to be sorted in. We cannot simply append them all.
+//             for (const position of positions) {
+//                 binarySearchAdd(playerLocations, position);
+//             }
+
+//             // Use map to replace the updated player's locations without mutating the others
+//             let newLocations = prevLocations.map((locations: any, index: any) =>
+//                 index === options.selectedPlayer ? playerLocations : locations
+//             );
+
+//             return newLocations;
+//         });
+//     };
+// };
+
+// const workerBlobURL = URL.createObjectURL(new Blob(['(', setStateWorkerFunction.toString(), ')()'], { type: 'application/javascript' }));
+
 export default function SingleImage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -30,6 +58,16 @@ export default function SingleImage() {
     const [canvasSize, setCanvasSize] = useState<[number, number]>([0, 0]);
     const [transparent, setTransparent] = useState<boolean>(false);
     const [num, setNum] = useState<number>();
+    const [type, setType] = useState<"outline" | "fill">("fill");
+    // const [worker, setWorker] = useState<Worker>();
+    // useEffect(() => {
+    //     try {
+    //         let worker = new Worker(workerBlobURL);
+    //         setWorker(worker);
+    //     } catch (e) {
+
+    //     }
+    // }, []);
     const mousemove = (event: MouseEvent) => {
         if (canvas) {
             const rect: DOMRect = canvas.getBoundingClientRect();
@@ -56,6 +94,7 @@ export default function SingleImage() {
         if (!isNaN(Number(router.query.num))) {
             const { num } = router.query;
             setNum(Number(num));
+            setNewRecentImage(Number(num));
             let image = getImageLoc(Number(num));
             checkFileExists(image).then((exists: boolean) => {
                 if (exists) {
@@ -69,6 +108,7 @@ export default function SingleImage() {
                     getTextData(getFileLoc(Number(num))).then((data: string) => {
                         let parsedData = deserialize(data);
                         setStateLocations(parsedData.locations);
+                        setType(parsedData.type || "outline");
                         const players = parsedData.positions.map((position: string[]) => {
                             return {
                                 locations: [],
@@ -127,28 +167,34 @@ export default function SingleImage() {
         }
     }, [stateLocations, selectedPlayer, transparent]);
     const updatePosition = (positions: [number, number][]) => {
+        //worker?.postMessage({ setStateLocations: setStateLocations.toString(), positions, binarySearchAdd: binarySearchAdd.toString() });
         setStateLocations(prevLocations => {
             let newLocations = [...prevLocations];
             if (newLocations[options.selectedPlayer]) {
                 for (const position of positions) {
                     //todo: speed up. sort array, use binary search to input
-                    if (!containsArray(newLocations[options.selectedPlayer], position)) {
-                        newLocations[options.selectedPlayer].push(position);
-                    }
+                    //newLocations[options.selectedPlayer].push(position);
+                    binarySearchAdd(newLocations[options.selectedPlayer], position);
                 }
             } else {
-                newLocations[options.selectedPlayer] = [...positions];
+                newLocations[options.selectedPlayer] = [];
+                for (const position of positions) {
+                    //newLocations[options.selectedPlayer].push(position);
+                    binarySearchAdd(newLocations[options.selectedPlayer], position);
+                }
             }
+            console.log(newLocations);
             return newLocations;
         });
     };
     const drawLocations = (locations: number[][][], transparent: boolean) => {
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const pi2 = 2 * Math.PI;
         for (let i = 0; i < locations.length; i++) {
             for (const coords of locations[i]) {
                 context.beginPath();
-                context.arc(coords[0], coords[1], 1, 0, 2 * Math.PI);
+                context.arc(coords[0], coords[1], 1, 0, pi2);
                 if (transparent) {
                     context.fillStyle = (i == options.selectedPlayer) ? "rgba(0, 0, 255, 0.1)" : "rgba(255, 0, 0, 0.1)";
                 } else {
@@ -156,6 +202,30 @@ export default function SingleImage() {
                 }
                 context.fill();
             }
+        }
+    };
+    const mapAdd = (map: Map<number[], boolean>, val: number[]): undefined => {
+        map.set(val, true);
+    };
+    const binarySearchContains = (arr: number[][], val: number[]): number => {
+        let low = 0;
+        let high = arr.length - 1;
+        while (low <= high) {
+            let mid = Math.floor((low + high) / 2);
+            if (arr[mid][0] === val[0] && arr[mid][1] === val[1]) {
+                return -1;
+            } else if (arr[mid][0] < val[0] || (arr[mid][0] === val[0] && arr[mid][1] < val[1])) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return low;
+    };
+    const binarySearchAdd = (arr: number[][], val: number[]): undefined => {
+        let index = binarySearchContains(arr, val);
+        if (index !== -1) {
+            arr.splice(index, 0, val);
         }
     };
     const containsArray = (arr: number[][], val: number[]): boolean => {
@@ -263,7 +333,7 @@ export default function SingleImage() {
                         className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
                         onClick={() => {
                             let positions = players.map((player: ImageData) => player.positions);
-                            const data = serialize(stateLocations, positions, canvasSize);
+                            const data = serialize(stateLocations, positions, canvasSize, type);
                             console.log(num, stateLocations, positions);
                             if (num !== undefined) {
                                 setIsLoading(true);
@@ -277,6 +347,16 @@ export default function SingleImage() {
                         }}
                     >
                         Save
+                    </button>
+                    <button
+                        className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
+                        onClick={() => {
+                            setType((type: "outline" | "fill") => {
+                                return type == "outline" ? "fill" : "outline";
+                            });
+                        }}
+                    >
+                        {`Type: ${type}`}
                     </button>
                 </div>
                 {showPlayers && players.length > 0 && (
@@ -294,28 +374,48 @@ export default function SingleImage() {
                                                 <p className="text-center text-sm">No positions set</p>
                                         }
                                     </div>
-                                    <button
-                                        className="bg-yellow-400 py-1 px-2 rounded-lg hover:brightness-90 active:brightness-75 border border-black"
-                                        onClick={() => {
-                                            options.selectedPlayer = i;
-                                            setSelectedPlayer(i);
-                                        }}
-                                    >
-                                        {selectedPlayer == i ? "Selected" : "Select"}
-                                    </button>
-                                    <button
-                                        className="bg-red-400 py-1 px-2 rounded-lg hover:brightness-90 active:brightness-75 border border-black"
-                                        onClick={() => {
-                                            console.log("reset");
-                                            setStateLocations(prevLocations => {
-                                                let newLocations = [...prevLocations];
-                                                newLocations[i] = [];
-                                                return newLocations;
-                                            });
-                                        }}
-                                    >
-                                        Reset
-                                    </button>
+                                    <div className="flex flex-row justify-center items-center gap-1">
+
+                                        <button
+                                            className="bg-yellow-400 py-1 px-2 rounded-lg hover:brightness-90 active:brightness-75 border border-black"
+                                            onClick={() => {
+                                                options.selectedPlayer = i;
+                                                setSelectedPlayer(i);
+                                            }}
+                                        >
+                                            {selectedPlayer == i ? "Selected" : "Select"}
+                                        </button>
+                                        <button
+                                            className="bg-red-400 py-1 px-2 rounded-lg hover:brightness-90 active:brightness-75 border border-black"
+                                            onClick={() => {
+                                                console.log("reset");
+                                                setStateLocations(prevLocations => {
+                                                    let newLocations = [...prevLocations];
+                                                    newLocations[i] = [];
+                                                    return newLocations;
+                                                });
+                                            }}
+                                        >
+                                            Reset
+                                        </button>
+                                        <button
+                                            className="bg-red-600 py-1 px-2 rounded-lg hover:brightness-90 active:brightness-75 border border-black"
+                                            onClick={() => {
+                                                setPlayers(players => {
+                                                    let newPlayers = [...players];
+                                                    newPlayers.splice(i, 1);
+                                                    return newPlayers;
+                                                });
+                                                setStateLocations(prevLocations => {
+                                                    let newLocations = [...prevLocations];
+                                                    newLocations.splice(i, 1);
+                                                    return newLocations;
+                                                });
+                                            }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
                             );
 
