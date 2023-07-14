@@ -155,13 +155,12 @@ export default function SingleImage() {
                 canvas.width = canvas2.width = 600;
             }
             canvas.height = canvas2.height = canvas.width * 9 / 16;
-            console.log(canvas.height, canvas2.height, canvas.width, canvas2.width);
             setCanvasSize1([canvas.width, canvas.height]);
             setCanvasSize2([canvas2.width, canvas2.height]);
             img = document.createElement("img");
             img2 = document.createElement("img");
             img.src = imageProps.loc;
-            img2.src = "/court.jpg";
+            img2.src = "/court.png";
             img.onload = () => {
                 context.drawImage(img, 0, 0, canvas.width, canvas.height);
                 firstDraw();
@@ -175,14 +174,27 @@ export default function SingleImage() {
             document.addEventListener("mousedown", mousedown);
             document.addEventListener("mouseup", mouseup);
             document.addEventListener("click", setCourtLoc);
+            document.addEventListener("keydown", keydown);
         }
         return () => {
             //@ts-ignore
             document.removeEventListener("mousedown", mousedown);
             document.removeEventListener("mouseup", mouseup);
             document.removeEventListener("click", setCourtLoc);
+            document.removeEventListener("keydown", keydown);
         };
     }, [imageProps, isLoading, imageExists]);
+    const keydown = (event: KeyboardEvent) => {
+        if (event.key == "a") {
+            document.getElementById("add")?.click();
+        } else if (event.key == "h") {
+            document.getElementById("hide")?.click();
+        } else if (event.key == "t") {
+            document.getElementById("transparent")?.click();
+        } else if (event.key == "d") {
+            document.getElementById("delete")?.click();
+        }
+    };
     const firstDraw = () => {
         setStateLocations(prevLocations => {
             drawLocations(prevLocations, transparent);
@@ -222,7 +234,6 @@ export default function SingleImage() {
                     binarySearchAdd(newLocations[options.selectedPlayer], position);
                 }
             }
-            console.log(newLocations);
             return newLocations;
         });
     };
@@ -238,10 +249,12 @@ export default function SingleImage() {
         context2.drawImage(img2, 0, 0, canvas2.width, canvas2.height);
         for (let i = 0; i < locations.length; i++) {
             const location = locations[i];
-            context2.fillStyle = (i == options.selectedPlayer) ? "blue" : "red";
-            context2.beginPath();
-            context2.arc(location[0], location[1], 10, 0, Math.PI * 2);
-            context2.fill();
+            if (locations[i].length === 2) {
+                context2.fillStyle = (i == options.selectedPlayer) ? "blue" : "red";
+                context2.beginPath();
+                context2.arc(location[0], location[1], 10, 0, Math.PI * 2);
+                context2.fill();
+            }
         }
     };
     const drawLocations = (locations: number[][][], transparent: boolean) => {
@@ -350,18 +363,20 @@ export default function SingleImage() {
                     <NextLink href={`/images/${Number(router.query.num)}`} text="Home" />
                     <NextLink href={`/images/image/${Number(router.query.num) + 1}`} text="Next" />
                 </div>
-                <div className="absolute m-2 top-0 left-0 gap-2 flex w-auto flex-col justify-center items-center">
+                <div className="absolute m-2 top-0 left-0 gap-2 w-auto grid grid-cols-2 place-items-center items-center">
                     <button
                         className={`${showPlayers ? "bg-red-600" : "bg-green-600"} px-4 w-full py-2 hover:brightness-90 active:brightness-75 rounded-lg`}
                         onClick={() => setShowPlayers(!showPlayers)}
+                        id="hide"
                     >
-                        {`${showPlayers ? "Hide" : "Show"} Players`}
+                        {`${showPlayers ? "Hide" : "Show"} Players (h)`}
                     </button>
                     <button
                         className={`${transparent ? "bg-red-600" : "bg-green-600"} px-4 w-full py-2 hover:brightness-90 active:brightness-75 rounded-lg`}
                         onClick={() => setTransparent(!transparent)}
+                        id="transparent"
                     >
-                        Toggle transparency
+                        {`Toggle transparency (t)`}
                     </button>
                     <button
                         className="bg-green-600 px-4 py-2 w-full hover:brightness-90 active:brightness-75 rounded-lg"
@@ -377,9 +392,20 @@ export default function SingleImage() {
 
                                 return newPlayers;
                             });
+                            setStateLocations(stateLocations => {
+                                let newLocations = [...stateLocations];
+                                newLocations.push([]);
+                                return newLocations;
+                            });
+                            setCourtLocations(courtLocations => {
+                                let newCourtLocations = [...courtLocations];
+                                newCourtLocations.push([]);
+                                return newCourtLocations;
+                            });
                         }}
+                        id="add"
                     >
-                        Add new player
+                        {`Add new player (a)`}
                     </button>
                     <button
                         className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
@@ -410,9 +436,10 @@ export default function SingleImage() {
                     >
                         {`Type: ${type}`}
                     </button>
+                    <p className="bg-gray-400/60 px-4 py-2 rounded-lg">{`Press (d) to delete selected`}</p>
                 </div>
                 {showPlayers && players.length > 0 && (
-                    <div className="absolute m-2 top-0 right-0 w-[30%] h-auto max-h-[95%] grid grid-cols-2 overflow-y-auto gap-2 rounded-lg p-2 bg-slate-600/60">
+                    <div className="absolute m-2 top-0 right-0 w-auto h-auto max-h-[95%] grid grid-cols-2 overflow-y-auto gap-2 rounded-lg p-2 bg-slate-600/60">
                         {players.map((player: ImageData, i: number) => {
                             return (
                                 <div key={i} className={`flex flex-col p-1 gap-1 justify-center items-center ${selectedPlayer == i ? "bg-yellow-400" : "bg-gray-400"}  rounded-lg`}>
@@ -473,9 +500,12 @@ export default function SingleImage() {
                                                     newLocations.splice(i, 1);
                                                     return newLocations;
                                                 });
+                                                setSelectedPlayer(0);
+                                                options.selectedPlayer = 0;
                                             }}
+                                            id={`${selectedPlayer == i ? "delete" : ""}`}
                                         >
-                                            Delete
+                                            {`Delete ${selectedPlayer == i ? "(d)" : ""}`}
                                         </button>
                                     </div>
                                 </div>
