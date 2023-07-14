@@ -59,7 +59,8 @@ export default function SingleImage() {
     const [penSize, setPenSize] = useState<number>(2);
     const [players, setPlayers] = useState<ImageData[]>([]);
     const [showPlayers, setShowPlayers] = useState<boolean>(true);
-    const [canvasSize, setCanvasSize] = useState<[number, number]>([0, 0]);
+    const [canvasSize1, setCanvasSize1] = useState<[number, number]>([0, 0]);
+    const [canvasSize2, setCanvasSize2] = useState<[number, number]>([0, 0]);
     const [transparent, setTransparent] = useState<boolean>(false);
     const [num, setNum] = useState<number>();
     const [type, setType] = useState<"outline" | "fill">("fill");
@@ -155,8 +156,8 @@ export default function SingleImage() {
             }
             canvas.height = canvas2.height = canvas.width * 9 / 16;
             console.log(canvas.height, canvas2.height, canvas.width, canvas2.width);
-            setCanvasSize([canvas.width, canvas.height]);
-
+            setCanvasSize1([canvas.width, canvas.height]);
+            setCanvasSize2([canvas2.width, canvas2.height]);
             img = document.createElement("img");
             img2 = document.createElement("img");
             img.src = imageProps.loc;
@@ -384,7 +385,7 @@ export default function SingleImage() {
                         className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
                         onClick={() => {
                             let positions = players.map((player: ImageData) => player.positions);
-                            const data = serialize(stateLocations, courtLocations, positions, canvasSize, type);
+                            const data = serialize(stateLocations, courtLocations, positions, canvasSize1, canvasSize2, type);
                             console.log(num, stateLocations, positions);
                             if (num !== undefined) {
                                 setIsLoading(true);
