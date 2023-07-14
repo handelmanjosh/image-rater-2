@@ -14,8 +14,11 @@ const availablePositions: string[] = [
 ];
 
 let canvas: HTMLCanvasElement;
+let canvas2: HTMLCanvasElement;
+let context2: CanvasRenderingContext2D;
 let context: CanvasRenderingContext2D;
 let img: HTMLImageElement;
+let img2: HTMLImageElement;
 let options: { selectedPlayer: number, size: number; } = { selectedPlayer: 0, size: 2 };
 // const setStateWorkerFunction = function () {
 //     self.onmessage = function (event) {
@@ -51,6 +54,7 @@ export default function SingleImage() {
     const [imageExists, setImageExists] = useState<boolean>(false);
     const [imageProps, setImageProps] = useState<ImageProps>({} as ImageProps);
     const [stateLocations, setStateLocations] = useState<number[][][]>([]);
+    const [courtLocations, setCourtLocations] = useState<number[][]>([]);
     const [selectedPlayer, setSelectedPlayer] = useState<number>(0);
     const [penSize, setPenSize] = useState<number>(2);
     const [players, setPlayers] = useState<ImageData[]>([]);
@@ -84,6 +88,16 @@ export default function SingleImage() {
             }
         }
     };
+    const setCourtLoc = (event: MouseEvent) => {
+        if (canvas2) {
+            const rect: DOMRect = canvas2.getBoundingClientRect();
+            const x: number = event.clientX - rect.left - window.scrollX;
+            const y: number = event.clientY - rect.top - window.scrollY;
+            if (x < canvas2.width && x > 0 && y < canvas2.height && y > 0) {
+                updateCourtPosition([Math.floor(x), Math.floor(y)]);
+            }
+        }
+    };
     const mousedown = () => {
         document.addEventListener("mousemove", mousemove);
     };
@@ -107,7 +121,8 @@ export default function SingleImage() {
                     });
                     getTextData(getFileLoc(Number(num))).then((data: string) => {
                         let parsedData = deserialize(data);
-                        setStateLocations(parsedData.locations);
+                        setStateLocations(parsedData.locations || []);
+                        setCourtLocations(parsedData.courtLocations || []);
                         setType(parsedData.type || "outline");
                         const players = parsedData.positions.map((position: string[]) => {
                             return {
@@ -128,31 +143,43 @@ export default function SingleImage() {
     useEffect(() => {
         if (!isLoading && imageExists) {
             canvas = document.getElementById("canvas") as HTMLCanvasElement;
-            context = canvas.getContext('2d') as CanvasRenderingContext2D;
+            canvas2 = document.getElementById("canvas2") as HTMLCanvasElement;
+            context = canvas.getContext("2d") as CanvasRenderingContext2D;
+            context2 = canvas2.getContext("2d") as CanvasRenderingContext2D;
             if (window.innerWidth < 768) {
-                canvas.width = 400;
+                canvas.width = canvas2.width = 200;
             } else if (window.innerWidth < 1024) {
-                canvas.width = 600;
+                canvas.width = canvas2.width = 400;
             } else {
-                canvas.width = 800;
+                canvas.width = canvas2.width = 600;
             }
-            canvas.height = canvas.width * 9 / 16;
+            canvas.height = canvas2.height = canvas.width * 9 / 16;
+            console.log(canvas.height, canvas2.height, canvas.width, canvas2.width);
             setCanvasSize([canvas.width, canvas.height]);
+
             img = document.createElement("img");
+            img2 = document.createElement("img");
             img.src = imageProps.loc;
+            img2.src = "/court.jpg";
             img.onload = () => {
                 context.drawImage(img, 0, 0, canvas.width, canvas.height);
                 firstDraw();
+            };
+            img2.onload = () => {
+                context2.drawImage(img2, 0, 0, canvas2.width, canvas.height);
+                firstDraw2();
             };
             //context.fillStyle = "black";
             //context.fillRect(0, 0, canvas.width, canvas.height);
             document.addEventListener("mousedown", mousedown);
             document.addEventListener("mouseup", mouseup);
+            document.addEventListener("click", setCourtLoc);
         }
         return () => {
             //@ts-ignore
             document.removeEventListener("mousedown", mousedown);
             document.removeEventListener("mouseup", mouseup);
+            document.removeEventListener("click", setCourtLoc);
         };
     }, [imageProps, isLoading, imageExists]);
     const firstDraw = () => {
@@ -161,11 +188,22 @@ export default function SingleImage() {
             return prevLocations;
         });
     };
+    const firstDraw2 = () => {
+        setCourtLocations(prevLocations => {
+            drawCourtLocations(prevLocations);
+            return prevLocations;
+        });
+    };
     useEffect(() => {
         if (context && canvas) {
             drawLocations(stateLocations, transparent);
         }
     }, [stateLocations, selectedPlayer, transparent]);
+    useEffect(() => {
+        if (context2 && canvas2) {
+            drawCourtLocations(courtLocations);
+        }
+    }, [courtLocations, selectedPlayer]);
     const updatePosition = (positions: [number, number][]) => {
         //worker?.postMessage({ setStateLocations: setStateLocations.toString(), positions, binarySearchAdd: binarySearchAdd.toString() });
         setStateLocations(prevLocations => {
@@ -186,6 +224,24 @@ export default function SingleImage() {
             console.log(newLocations);
             return newLocations;
         });
+    };
+    const updateCourtPosition = (position: number[]) => {
+        setCourtLocations((prevCourtLocations: number[][]) => {
+            const newLocations = [...prevCourtLocations];
+            newLocations[options.selectedPlayer] = position;
+            return newLocations;
+        });
+    };
+    const drawCourtLocations = (locations: number[][]) => {
+        context2.clearRect(0, 0, canvas2.width, canvas2.height);
+        context2.drawImage(img2, 0, 0, canvas2.width, canvas2.height);
+        for (let i = 0; i < locations.length; i++) {
+            const location = locations[i];
+            context2.fillStyle = (i == options.selectedPlayer) ? "blue" : "red";
+            context2.beginPath();
+            context2.arc(location[0], location[1], 10, 0, Math.PI * 2);
+            context2.fill();
+        }
     };
     const drawLocations = (locations: number[][][], transparent: boolean) => {
         context.clearRect(0, 0, canvas.width, canvas.height);
@@ -228,14 +284,6 @@ export default function SingleImage() {
             arr.splice(index, 0, val);
         }
     };
-    const containsArray = (arr: number[][], val: number[]): boolean => {
-        for (const item of arr) {
-            if (item[0] === val[0] && item[1] === val[1]) {
-                return true;
-            }
-        }
-        return false;
-    };
     if (isLoading) {
         return (
             <div className="w-screen h-screen">
@@ -252,7 +300,10 @@ export default function SingleImage() {
     } else {
         return (
             <div className="relative flex flex-col justify-center items-center h-screen w-screen gap-4">
-                <canvas id="canvas" />
+                <div className="flex flex-row justify-center items-center gap-2">
+                    <canvas id="canvas2" />
+                    <canvas id="canvas" />
+                </div>
                 <div className="grid grid-cols-7 gap-2 place-items-center items-center">
                     {availablePositions.map((position: string, i: number) => (
                         <button
@@ -333,7 +384,7 @@ export default function SingleImage() {
                         className="bg-yellow-400 px-4 py-2 hover:brightness-90 w-full active:brightness-75 rounded-lg"
                         onClick={() => {
                             let positions = players.map((player: ImageData) => player.positions);
-                            const data = serialize(stateLocations, positions, canvasSize, type);
+                            const data = serialize(stateLocations, courtLocations, positions, canvasSize, type);
                             console.log(num, stateLocations, positions);
                             if (num !== undefined) {
                                 setIsLoading(true);
@@ -394,6 +445,11 @@ export default function SingleImage() {
                                                     newLocations[i] = [];
                                                     return newLocations;
                                                 });
+                                                setCourtLocations(prevCourtLocations => {
+                                                    let newLocations = [...prevCourtLocations];
+                                                    newLocations[i] = [];
+                                                    return newLocations;
+                                                });
                                             }}
                                         >
                                             Reset
@@ -408,6 +464,11 @@ export default function SingleImage() {
                                                 });
                                                 setStateLocations(prevLocations => {
                                                     let newLocations = [...prevLocations];
+                                                    newLocations.splice(i, 1);
+                                                    return newLocations;
+                                                });
+                                                setCourtLocations(prevCourtLocations => {
+                                                    let newLocations = [...prevCourtLocations];
                                                     newLocations.splice(i, 1);
                                                     return newLocations;
                                                 });
